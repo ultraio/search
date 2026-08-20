@@ -23,7 +23,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (i *Indexer) NextUnindexedBlockPast(startBlockNum uint64) (nextStartBlockNum uint64) {
+func (i *Indexer) NextUnindexedBlockPast(startBlockNum uint64) (nextStartBlockNum uint64, err error) {
 	nextStartBlockNum = startBlockNum
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -32,7 +32,7 @@ func (i *Indexer) NextUnindexedBlockPast(startBlockNum uint64) (nextStartBlockNu
 	remote, err := i.indexesStore.ListFiles(ctx, fmt.Sprintf("shards-%d/", i.shardSize), ".tmp", 9999999)
 	if err != nil {
 		zlog.Error("listing files from indexes store", zap.Error(err))
-		return
+		return startBlockNum, fmt.Errorf("listing files from indexes store: %w", err)
 	}
 
 	remotePathRE := regexp.MustCompile(`(\d{10})\.bleve\.tar\.zst`)
@@ -67,7 +67,7 @@ func (i *Indexer) NextUnindexedBlockPast(startBlockNum uint64) (nextStartBlockNu
 		nextStartBlockNum = fileStartBlock
 	}
 
-	return i.alignStartBlock(nextStartBlockNum)
+	return i.alignStartBlock(nextStartBlockNum), nil
 }
 
 func (i *Indexer) alignStartBlock(startBlock uint64) uint64 {

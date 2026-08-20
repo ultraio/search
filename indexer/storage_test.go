@@ -15,10 +15,55 @@
 package indexer
 
 import (
+	"context"
+	"errors"
 	"testing"
 
+	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+type listFilesErrorStore struct {
+	dstore.Store
+	err error
+}
+
+func (s *listFilesErrorStore) ListFiles(context.Context, string, string, int) ([]string, error) {
+	return nil, s.err
+}
+
+func TestIndexer_NextUnindexedBlockPast(t *testing.T) {
+	store := dstore.NewMockStore(nil)
+	store.SetFile("shards-50/0000000100.bleve.tar.zst", nil)
+	store.SetFile("shards-50/0000000150.bleve.tar.zst", nil)
+	store.SetFile("shards-50/0000000200.bleve.tar.zst", nil)
+	store.SetFile("shards-50/0000000300.bleve.tar.zst", nil)
+
+	indexer := &Indexer{indexesStore: store, shardSize: 50}
+
+	nextStartBlock, err := indexer.NextUnindexedBlockPast(100)
+
+	require.NoError(t, err)
+	assert.Equal(t, uint64(200), nextStartBlock)
+}
+
+func TestIndexer_NextUnindexedBlockPast_ListFilesError(t *testing.T) {
+	expectedErr := errors.New("list files failed")
+	indexer := &Indexer{
+		indexesStore: &listFilesErrorStore{
+			Store: dstore.NewMockStore(nil),
+			err:   expectedErr,
+		},
+		shardSize: 50,
+	}
+
+	nextStartBlock, err := indexer.NextUnindexedBlockPast(100)
+
+	assert.Equal(t, uint64(100), nextStartBlock)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, expectedErr))
+}
 
 func TestIndexer_alignStartBlock(t *testing.T) {
 	tests := []struct {
