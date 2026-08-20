@@ -85,7 +85,10 @@ func (a *App) resolveStartBlock(ctx context.Context, dexer *indexer.Indexer) (ta
 			return
 		}
 		zlog.Info("get relative block", zap.Uint64("block_num", targetStartBlock))
-		targetStartBlock = dexer.NextUnindexedBlockPast(targetStartBlock) // skip already processed indexes
+		targetStartBlock, err = dexer.NextUnindexedBlockPast(targetStartBlock) // skip already processed indexes
+		if err != nil {
+			return
+		}
 		zlog.Info("next un-indexed block past", zap.Uint64("block_num", targetStartBlock))
 	}
 
